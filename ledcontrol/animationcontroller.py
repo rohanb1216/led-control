@@ -202,10 +202,14 @@ class AnimationController:
                 elif k == 'sacn' and self._enable_sacn:
                     if v:
                         self._receiver = sacn.sACNreceiver()
-                        self._receiver.listen_on('universe', universe=1)(self._sacn_callback)
+                        self._receiver.listen_on('universe', universe=1)(self._sacn_callbacka)
+                        self._receiver.listen_on('universe', universe=2)(self._sacn_callbackb)
+                        # self._receiverb = sacn.sACNreceiver()
                         self._receiver.start()
+                        # self._receiverb.start()
                     elif hasattr(self, '_receiver'):
                         self._receiver.stop()
+                        # self._receiverb.stop()
 
             return d1
 
@@ -443,7 +447,7 @@ class AnimationController:
 
             self._led_controller.render()
 
-    def _sacn_callback(self, packet):
+    def _sacn_callbacka(self, packet):
         'Callback for sACN / E1.31 client'
         sacn_time = time.perf_counter()
         self._sacn_perf_avg += (sacn_time - self._last_sacn_time)
@@ -454,8 +458,26 @@ class AnimationController:
             print('Average sACN rate (packets/s): {}'.format(1 / (self._sacn_perf_avg / 100)))
             self._sacn_perf_avg = 0
 
-        data = [x / 255.0 for x in packet.dmxData[:self._led_count * 3]]
-        self._sacn_buffer = list(zip_longest(*(iter(data),) * 3))
+        # print("universe a ", self._sacn_buffer)
+        data = [x / 255.0 for x in packet.dmxData[:510]]
+        self._sacn_buffer = list(zip_longest(*(iter(data),) * 3)) + self._sacn_buffer[170:]
+
+
+    def _sacn_callbackb(self, packet):
+        'Callback for sACN / E1.31 client'
+        sacn_time = time.perf_counter()
+        self._sacn_perf_avg += (sacn_time - self._last_sacn_time)
+        self._last_sacn_time = sacn_time
+
+        self._sacn_count += 1
+        if self._sacn_count % 100 == 0:
+            print('Average sACN rate (packets/s): {}'.format(1 / (self._sacn_perf_avg / 100)))
+            self._sacn_perf_avg = 0
+
+        data = [x / 255.0 for x in packet.dmxData[:510]]
+        self._sacn_buffer = self._sacn_buffer[:170] + list(zip_longest(*(iter(data),) * 3))[:90]
+        # print("universe b ", self._sacn_buffer)
+
 
     def clear_leds(self):
         'Turn all LEDs off'
@@ -479,6 +501,7 @@ class AnimationController:
         try:
             if self._enable_sacn and self._receiver:
                 self._receiver.stop()
+                # self._receiverb.stop()
         except:
             pass
 
